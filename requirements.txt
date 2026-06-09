@@ -1,6 +1,6 @@
 numpy
 python-bidi
 easyocr
-libzbar0
 pyzbar
 python-barcode
+streamlit_cropper
