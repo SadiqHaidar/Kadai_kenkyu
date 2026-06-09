@@ -1,6 +1,6 @@
 numpy
 python-bidi
 easyocr
-zbar
+libzbar0
 pyzbar
 python-barcode
