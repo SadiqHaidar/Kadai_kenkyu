@@ -2,4 +2,4 @@ numpy
 python-bidi
 easyocr
 pyzbar
-barcode_utils
+python-barcode
