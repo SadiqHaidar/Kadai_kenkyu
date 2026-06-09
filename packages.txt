@@ -1,4 +1,5 @@
 freeglut3-dev
+libgl1
 easyocr
 opencv-python-headless
 numpy
