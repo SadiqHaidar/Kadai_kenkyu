@@ -7,10 +7,24 @@ import constant as const
 import barcode_utils as b_util
 import db_utils as d_util
 import text_utils as t_util
+from streamlit_cropper import st_cropper
 
-# ページの設定
 
-st.set_page_config(page_title="Halal Checker", page_icon="🌙")
+# --- 1. Session Stateの初期化 (エラー回避のために必須) ---
+# アプリ起動時に「箱」を空の状態で用意しておきます
+if "temp_status" not in st.session_state:
+    st.session_state.temp_status = None
+if "temp_ingredients" not in st.session_state:
+    st.session_state.temp_ingredients = ""
+if "found_haram" not in st.session_state:
+    st.session_state.found_haram = []
+if "found_doubtful" not in st.session_state:
+    st.session_state.found_doubtful = []
+
+st.set_page_config(
+    page_title="Halal Checker", 
+    page_icon="Halal.png"  # 👈 ここに用意した画像ファイル名を書くだけ！
+)
 
 st.title("🌙 Halal Checker")
 st.write("بِسْمِ ٱللّٰهِ ٱلرَّحْمٰنِ ٱلرَّحِيمِ")
@@ -18,7 +32,7 @@ st.write("بِسْمِ ٱللّٰهِ ٱلرَّحْمٰنِ ٱلرَّحِيم�
 tab1, tab2 = st.tabs(["Ingredient Label Analysis", "Barcode Verification"]) # タブの追加: 原材料分析とバーコード検証
 
 # OCRモデルの読み込み（キャッシュして高速化）
-@st.cache_resource
+@st.cache_resource  
 
 def load_ocr():
 
@@ -44,59 +58,98 @@ with tab1:
         # 【修正！】スマホ写真の回転情報を補正（文字化け対策に必須）
         img = ImageOps.exif_transpose(img)
         
-        # 画面に表示
-        st.image(img, caption="Target Image for Analysis", width=400)
+        # --- 手動トリミング機能 ---
+        st.subheader("✂️ Step 1: Crop Ingredients Area")
+        st.info("原材料名の枠が収まるように、マウスで範囲を指定してください。")
+        
+        # 自由な比率で切り抜き
+        cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None)
+        
+        st.write("Target area:")
+        st.image(cropped_img, width=300)
 
-        img_array = np.array(img)
+        img_array = np.array(cropped_img)
 
+        if st.button("🔍 Analyze This Area"):
+            with st.spinner('Analyzing...'):
+                img_array = np.array(cropped_img)
+                results = reader.readtext(img_array, detail=0)
+                raw_text = " ".join(results) # 文字がくっつかないようスペース結合
 
+                # テキストの修正と抽出
+                corrected_text = t_util.clean_text(raw_text)
+                full_text = t_util.extract_ingredients(corrected_text)
 
-        with st.spinner('Analyzing...'):
-            # OCR実行
-            results = reader.readtext(img_array, detail=0)
-            raw_text = "".join(results)
+                # 判定ロジック (text_utilsで牛乳・生乳はすでに「MILK」に置換済)
+                found_haram = [k for k in const.HARAM_KEYWORDS if k in full_text]
+                found_doubtful = [k for k in const.DOUBTFUL_KEYWORDS if k in full_text]
 
-            # 1. まず誤字を直し、原材料セクションを抽出、さらに「牛乳/生乳」を「MILK」に置換
-            # text_utils側で一括処理されます
-            corrected_text = t_util.clean_text(raw_text)
-            full_text = t_util.extract_ingredients(corrected_text)
+                # 【重要】結果をセッションに代入（これでリロードされても消えません）
+                st.session_state.temp_ingredients = full_text
+                st.session_state.found_haram = found_haram
+                st.session_state.found_doubtful = found_doubtful
+                
+                if found_haram:
+                    st.session_state.temp_status = "HARAM"
+                elif found_doubtful:
+                    st.session_state.temp_status = "DOUBTFUL"
+                else:
+                    st.session_state.temp_status = "SAFE"
 
-        st.subheader("🔍 Analysis Results")
+        # --- 判定結果の表示エリア (セッションにデータがあれば常に表示) ---
+        if st.session_state.temp_status is not None:
+            st.divider()
+            st.subheader("🔍 Analysis Results")
 
-        # 2. 判定ロジック
-        # すでに full_text 内の「牛乳」は「MILK」になっているため、
-        # HARAM_KEYWORDS にある「牛」にはヒットしなくなります
-        found_haram_items = [k for k in const.HARAM_KEYWORDS if k in full_text]
-        found_doubtful_items = [k for k in const.DOUBTFUL_KEYWORDS if k in full_text]
+            if st.session_state.temp_status == "SAFE":
+                st.success(const.MSG_SAFE)
+            else:
+                if st.session_state.found_haram:
+                    st.error(const.MSG_HARAM_TITLE)
+                    for item in st.session_state.found_haram:
+                        eng = const.TRANSLATION_MAP.get(item, "Unknown")
+                        st.write(f"❌ **{item}** : {eng}")
 
-        st.divider()
-        st.subheader("Analysis Results")
+                if st.session_state.found_doubtful:
+                    st.warning(const.MSG_DOUBTFUL_TITLE)
+                    for item in st.session_state.found_doubtful:
+                        eng = const.TRANSLATION_MAP.get(item, "Unknown")
+                        st.write(f"⚠️ **{item}** : {eng}")
+                    st.info(const.MSG_DOUBTFUL_NOTE)
 
-        if not found_haram_items and not found_doubtful_items:
-            st.success(const.MSG_SAFE)
-        else:
-            # ハラーム成分の表示
-            if found_haram_items:
-                st.error(const.MSG_HARAM_TITLE)
-                for item in found_haram_items:
-                    eng = const.TRANSLATION_MAP.get(item, "Unknown")
-                    st.write(f"❌ **{item}** : {eng}")
-
-            # 疑義成分の表示
-            if found_doubtful_items:
-                st.warning(const.MSG_DOUBTFUL_TITLE)
-                for item in found_doubtful_items:
-                    eng = const.TRANSLATION_MAP.get(item, "Unknown")
-                    st.write(f"⚠️ **{item}** : {eng}")
-                st.info(const.MSG_DOUBTFUL_NOTE)
-
-        with st.expander("Check the Full OCR Text"):
-
-            st.write(full_text)
-
-
+            with st.expander("Check the Full OCR Text"):
+                st.write(st.session_state.temp_ingredients)
 
         st.caption("※This judgment is for reference only. Please prioritize checking with the manufacturer or looking for Halal certification marks.")
+
+        st.divider()
+        st.subheader("💾 Save to Database")
+        st.write("To help other users, please take a photo of the product's barcode.")
+            
+        # 保存用にバーコード写真をアップロード（またはカメラ起動）
+        save_barcode_file = st.file_uploader("Take a photo of the Barcode", key="save_bar", type=['jpg', 'png', 'jpeg'])
+
+        if save_barcode_file:
+            bar_img = Image.open(save_barcode_file)
+            st.image(bar_img, caption="Scanning barcode...", width=200)
+            
+            # 画像からJANコードを自動取得
+            detected_code = b_util.get_barcode_from_image(bar_img)
+                
+            if detected_code:
+                st.success(f"Barcode Detected: {detected_code}")
+                    
+                # 保存実行
+                if st.button(f"Register as Barcode {detected_code}"):
+                    d_util.save_product(
+                        barcode=detected_code,
+                        status=st.session_state.temp_status, # 前のステップで保存した判定結果
+                        ingredients_en=st.session_state.temp_ingredients # 解析した原材料
+                    )
+                    st.success("Registration Complete!")
+                    st.balloons()
+            else:
+                st.error("Could not find a barcode. Please try again or clear the photo.")
 
 
 with tab2:
@@ -121,8 +174,6 @@ with tab2:
             product = d_util.search_product(code_number)
             
             if product:
-
-                st.balloons() # 登録済みならお祝い！
 
                 # すでに登録がある場合
                 st.info("Product is registered in the database!")

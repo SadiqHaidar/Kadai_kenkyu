@@ -30,7 +30,7 @@ HARAM_KEYWORDS = ["豚", "ポーク", "ラード", "ゼラチン", "酒", "み�
 DOUBTFUL_KEYWORDS = ["アミノ酸", "ショートニング", "マーガリン", "乳化剤"]
 
 # 英語メッセージ
-MSG_SAFE = "✅ No restricted ingredients detected."
-MSG_HARAM_TITLE = "⚠️ HARAM Ingredients Found!"
-MSG_DOUBTFUL_TITLE = "❓ DOUBTFUL Ingredients Found (Mushbooh)"
+MSG_SAFE = "✅ SAFE: No restricted ingredients detected."
+MSG_HARAM_TITLE = "⚠️ HARAM: HARAM Ingredients Found!"
+MSG_DOUBTFUL_TITLE = "❓ DOUBTFUL: DOUBTFUL Ingredients Found (Mushbooh)"
 MSG_DOUBTFUL_NOTE = "Note: These ingredients may be plant-based or animal-based. Please check for a Halal certificate."

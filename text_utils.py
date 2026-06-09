@@ -37,17 +37,6 @@ def extract_ingredients(text):
     # 1. 判定前に「牛乳」「生乳」を「MILK」という無害な英単語に置き換える
     # これにより、後の「牛」というキーワードチェックにかからなくなります
     text = text.replace("牛乳", "MILK").replace("生乳", "MILK")
-
-    # 2. 正規表現による抽出ロジック
-    # 「原材料名」または「原材料」から始まり、特定のキーワード（内容量、保存方法など）
-    # が現れる直前までのテキストを、改行を含めて(re.DOTALL)抜き出します
-    pattern = r"(?:原材料名|原材料)[:：\s]*(.*?)(?=内容量|保存方法|賞味期限|製造者|栄養成分|$)"
-    match = re.search(pattern, text, re.DOTALL)
-
-    if match:
-        result = match.group(1).strip()
-        # 不要な記号などを取り除く
-        return result.strip(":： ")
     
     # 見つからなかった場合は、既に「MILK」置換済みのテキストを返す
     return text
