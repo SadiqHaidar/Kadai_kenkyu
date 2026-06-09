@@ -3,4 +3,3 @@ python-bidi
 easyocr
 pyzbar
 python-barcode
-barcode_utils
