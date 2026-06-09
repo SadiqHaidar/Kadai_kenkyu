@@ -1,5 +1,0 @@
-python3-pip
-python3-dev
-freeglut3-dev
-libgl1
-easyocr
