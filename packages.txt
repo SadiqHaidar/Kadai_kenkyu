@@ -1,2 +1,5 @@
 freeglut3-dev
 libgl1-mesa-glx
+easyocr
+opencv-python-headless
+numpy
