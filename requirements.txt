@@ -4,3 +4,4 @@ easyocr
 pyzbar
 python-barcode
 streamlit_cropper
+libzbar
