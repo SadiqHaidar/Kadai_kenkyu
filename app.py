@@ -41,7 +41,7 @@ def main():
 
     reader = load_ocr()
 
-    with tab1:
+    with tab1: # タブ1: 原材料分析
         # カメラまたはファイルアップロード
 
         # img_file = st.camera_input("原材料ラベルを撮影")
@@ -64,7 +64,7 @@ def main():
             st.info("原材料名の枠が収まるように、マウスで範囲を指定してください。")
             
             # 自由な比率で切り抜き
-            cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None)
+            cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, use_container_width=True)
             
             st.write("Target area:")
             st.image(cropped_img, width=300)
@@ -153,7 +153,7 @@ def main():
                     st.error("Could not find a barcode. Please try again or clear the photo.")
 
 
-    with tab2:
+    with tab2: # タブ2: バーコード検証
 
         barcode_file = st.file_uploader("Take a photo or select from folder", key = "bar", type=['jpg', 'png', 'jpeg'])
 
