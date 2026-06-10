@@ -59,6 +59,9 @@ def main():
             # 【修正！】スマホ写真の回転情報を補正（文字化け対策に必須）
             img = ImageOps.exif_transpose(img)
             
+            # 【ここを追加！】巨大な画像をトリミング画面からはみ出さないように最大横幅800pxに縮小
+            img.thumbnail((800, 800))
+
             # --- 手動トリミング機能 ---
             st.subheader("✂️ Step 1: Crop Ingredients Area")
             st.info("原材料名の枠が収まるように、マウスで範囲を指定してください。")
