@@ -64,7 +64,7 @@ def main():
             st.info("原材料名の枠が収まるように、マウスで範囲を指定してください。")
             
             # 自由な比率で切り抜き
-            cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, use_container_width=True)
+            cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, should_resize_image=True)
             
             st.write("Target area:")
             st.image(cropped_img, width=300)
