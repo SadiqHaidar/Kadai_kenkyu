@@ -60,7 +60,7 @@ def main():
             img = ImageOps.exif_transpose(img)
             
             # 【ここを追加！】巨大な画像をトリミング画面からはみ出さないように最大横幅800pxに縮小
-            img.thumbnail((800, 800))
+            img.thumbnail((600, 600))
 
             # --- 手動トリミング機能 ---
             st.subheader("✂️ Step 1: Crop Ingredients Area")
