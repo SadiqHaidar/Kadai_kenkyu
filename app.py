@@ -156,7 +156,7 @@ def main():
                                 ingredients_en=st.session_state.temp_ingredients # 解析した原材料
                             )
                             st.success("Registration Complete!")
-                            st.balloons()
+                            st.balloons() # お祝いの演出
                 else:
                     st.error("Could not find a barcode. Please try again or clear the photo.")
 
