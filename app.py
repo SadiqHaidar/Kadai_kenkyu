@@ -143,15 +143,20 @@ def main():
                 if detected_code:
                     st.success(f"Barcode Detected: {detected_code}")
                         
-                    # 保存実行
-                    if st.button(f"Register as Barcode {detected_code}"):
-                        d_util.save_product(
-                            barcode=detected_code,
-                            status=st.session_state.temp_status, # 前のステップで保存した判定結果
-                            ingredients_en=st.session_state.temp_ingredients # 解析した原材料
-                        )
-                        st.success("Registration Complete!")
-                        st.balloons()
+                    # 【修正ポイント】フォームを使って、ボタンを押したときに写真データが消えるのを防ぎます
+                    with st.form(key="register_form"):
+                        st.write("Click the button below to complete the registration.")
+                        submit_button = st.form_submit_button(label=f"Register as Barcode {detected_code}")
+
+                        # 保存実行
+                        if submit_button:
+                            d_util.save_product(
+                                barcode=detected_code,
+                                status=st.session_state.temp_status, # 前のステップで保存した判定結果
+                                ingredients_en=st.session_state.temp_ingredients # 解析した原材料
+                            )
+                            st.success("Registration Complete!")
+                            st.balloons()
                 else:
                     st.error("Could not find a barcode. Please try again or clear the photo.")
 
