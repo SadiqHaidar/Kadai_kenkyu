@@ -1,5 +1,6 @@
 numpy
 python-bidi
+torch
 easyocr
 pyzbar
 python-barcode
