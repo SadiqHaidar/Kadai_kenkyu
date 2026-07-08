@@ -72,21 +72,16 @@ def main():
             # 自由な比率で切り抜き
             #cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, should_resize_image=True)
             
-            # 1. 画面の横幅いっぱいに広がる「器（コンテナ）」を1つ作る
-            # （この container は、スマホならスマホの幅、PCならPCの幅に自動でサイズが変わります）
-            container = st.container()
+            # 画面を 「5%の余白 | 90%の本番画面 | 5%の余白」 に3分割する
+            col1, col2, col3 = st.columns([1, 18, 1])
 
-            with container:
-            # 2. 過去のコード（st_cropper）をこの中に入れる
-            # max_width をあえて指定しない、または非常に大きな値（1000など）にしておくと、
-            # この container（画面の横幅）のサイズに合わせて自動でフィットしてくれます！
+            with col2: # 真ん中の90%のエリアの中だけでトリミング画面を動かす
                 cropped_img = st_cropper(
                     img, 
                     realtime_update=True, 
                     box_color='#00FF00', 
                     aspect_ratio=None, 
                     should_resize_image=True
-                    # ★ あえて max_width を書かない、もしくは削除する
                 )
 
             st.write("Target area:")
