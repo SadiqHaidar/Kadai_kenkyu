@@ -62,9 +62,12 @@ def main():
             # 【ここを追加！】巨大な画像をトリミング画面からはみ出さないように最大横幅800pxに縮小
             img.thumbnail((600, 600))
 
+            # ✨【さらに追加！】小さくした画像を、スマホの画面幅にぴったりフィットさせて表示する
+            st.image(img, caption="アップロードされた画像", use_container_width=True)
+
             # --- 手動トリミング機能 ---
             st.subheader("✂️ Step 1: Crop Ingredients Area")
-            st.info("原材料名の枠が収まるように、マウスで範囲を指定してください。")
+            st.info("Please specify the range so that the ""Ingredients"" (原材料名)section fits within it.")
             
             # 自由な比率で切り抜き
             cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, should_resize_image=True)
@@ -135,8 +138,9 @@ def main():
 
             if save_barcode_file:
                 bar_img = Image.open(save_barcode_file)
-                st.image(bar_img, caption="Scanning barcode...", width=200)
-                
+                cropped_img = b_util.crop_barcode(bar_img)
+                st.image(cropped_img, caption="Scanning barcode...", width=200)
+
                 # 画像からJANコードを自動取得
                 detected_code = b_util.get_barcode_from_image(bar_img)
                     

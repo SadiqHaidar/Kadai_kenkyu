@@ -27,7 +27,7 @@ def init_db():
     conn.close()
 
 def push_to_github():
-    """新しくなったデータベースファイルを自動でGitHubのkadai_kenkyuブランチに送信（バックアップ）する"""
+    """新しくなったデータベースファイルを自動でGitHubのkadai_kenkyuブランチに送信(バックアップ)する"""
     try:
         token = st.secrets["GITHUB_TOKEN"]
         repo = st.secrets["GITHUB_REPO"]
