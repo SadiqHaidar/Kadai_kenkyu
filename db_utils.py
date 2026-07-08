@@ -27,7 +27,7 @@ def init_db():
     conn.close()
 
 def push_to_github():
-    """新しくなったデータベースファイルを自動でGitHubに送信（バックアップ）する"""
+    """新しくなったデータベースファイルを自動でGitHubのkadai_kenkyuブランチに送信（バックアップ）する"""
     try:
         token = st.secrets["GITHUB_TOKEN"]
         repo = st.secrets["GITHUB_REPO"]
@@ -36,9 +36,10 @@ def push_to_github():
         with open(DB_NAME, "rb") as f:
             encoded_content = base64.b64encode(f.read()).decode("utf-8")
             
-        url = f"https://api.github.com/repos/{repo}/contents/{DB_NAME}"
+        # ★【修正ポイント】?ref= の後ろを「kadai_kenkyu」に変更
+        url = f"https://api.github.com/repos/{repo}/contents/{DB_NAME}?ref=kadai_kenkyu"
         
-        # 2. 現在GitHub側にある古いファイルの「sha（識別子）」を取得する（上書きに必須）
+        # 2. 現在GitHubのkadai_kenkyuブランチ側にある古いファイルの「sha（識別子）」を取得する
         sha = None
         req_get = urllib.request.Request(url)
         req_get.add_header("Authorization", f"token {token}")
@@ -48,19 +49,22 @@ def push_to_github():
                 data = json.loads(response.read().decode())
                 sha = data["sha"]
         except urllib.error.HTTPError as e:
-            # 初回など、GitHub側にまだファイルがない場合はshaなしで進む
+            # 初回など、まだファイルがない場合はshaなしで進む
             if e.code != 404:
                 raise e
 
         # 3. GitHubへ上書きアップロードを実行
+        # ★【修正ポイント】"branch" の指定を「kadai_kenkyu」に変更
         payload = {
             "message": "🔄 Auto-updated database from Halal Checker App",
-            "content": encoded_content
+            "content": encoded_content,
+            "branch": "kadai_kenkyu"  
         }
         if sha:
             payload["sha"] = sha
             
-        req_put = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="PUT")
+        upload_url = f"https://api.github.com/repos/{repo}/contents/{DB_NAME}"
+        req_put = urllib.request.Request(upload_url, data=json.dumps(payload).encode("utf-8"), method="PUT")
         req_put.add_header("Authorization", f"token {token}")
         req_put.add_header("Content-Type", "application/json")
         
