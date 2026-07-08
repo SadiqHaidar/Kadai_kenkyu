@@ -70,8 +70,25 @@ def main():
             st.info("Please specify the range so that the ""Ingredients"" (原材料名)section fits within it.")
             
             # 自由な比率で切り抜き
-            cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, should_resize_image=True)
+            #cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, should_resize_image=True)
             
+            # 1. 画面の横幅いっぱいに広がる「器（コンテナ）」を1つ作る
+            # （この container は、スマホならスマホの幅、PCならPCの幅に自動でサイズが変わります）
+            container = st.container()
+
+            with container:
+            # 2. 過去のコード（st_cropper）をこの中に入れる
+            # max_width をあえて指定しない、または非常に大きな値（1000など）にしておくと、
+            # この container（画面の横幅）のサイズに合わせて自動でフィットしてくれます！
+                cropped_img = st_cropper(
+                    img, 
+                    realtime_update=True, 
+                    box_color='#00FF00', 
+                    aspect_ratio=None, 
+                    should_resize_image=True
+                    # ★ あえて max_width を書かない、もしくは削除する
+                )
+
             st.write("Target area:")
             st.image(cropped_img, width=300)
 
