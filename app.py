@@ -150,8 +150,7 @@ def main():
 
             if save_barcode_file:
                 bar_img = Image.open(save_barcode_file)
-                cropped_img = b_util.crop_barcode(bar_img)
-                st.image(cropped_img, caption="Scanning barcode...", width=200)
+                st.image(bar_img, caption="Scanning barcode...", width=200)
 
                 # 画像からJANコードを自動取得
                 detected_code = b_util.get_barcode_from_image(bar_img)
