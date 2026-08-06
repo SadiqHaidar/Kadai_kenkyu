@@ -87,8 +87,6 @@ def main():
             st.write("Target area:")
             st.image(cropped_img, width=300)
 
-            img_array = np.array(cropped_img)
-
             if st.button("🔍 Analyze This Area"):
                 with st.spinner('Analyzing...'):
                     img_array = np.array(cropped_img)

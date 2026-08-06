@@ -9,6 +9,7 @@ import streamlit as st
 
 DB_NAME = "halal_database.db"
 
+@st.cache_resource(show_spinner=False)
 def init_db():
     """データベースファイルとテーブルを自動で作成する"""
     conn = sqlite3.connect(DB_NAME)
