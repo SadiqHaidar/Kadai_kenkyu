@@ -6,6 +6,7 @@ import json
 import urllib.request
 import urllib.error
 import streamlit as st
+from datetime import datetime
 
 DB_NAME = "halal_database.db"
 
@@ -24,6 +25,22 @@ def init_db():
             doubtful_count INTEGER DEFAULT 0
         )
     """)
+
+    # 【新規追加】運営による確認結果を、ユーザー投稿(status/ingredients_en)とは
+    # 別のカラムで管理する。既に運用中で作られているDBファイルにも安全に
+    # カラムを追加できるよう、無ければ追加する形にしている(データは消えない)。
+    cursor.execute("PRAGMA table_info(products)")
+    existing_columns = [row[1] for row in cursor.fetchall()]
+
+    new_columns = {
+        "admin_status": "TEXT",
+        "admin_ingredients_en": "TEXT",
+        "verified_at": "TEXT",
+    }
+    for col_name, col_type in new_columns.items():
+        if col_name not in existing_columns:
+            cursor.execute(f"ALTER TABLE products ADD COLUMN {col_name} {col_type}")
+            
     conn.commit()
     conn.close()
 
@@ -80,16 +97,32 @@ def search_product(barcode):
     init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT barcode, status, ingredients_en, safe_count, haram_count, doubtful_count FROM products WHERE barcode = ?", (str(barcode),))
+    cursor.execute("""
+        SELECT barcode, status, ingredients_en, safe_count, haram_count, doubtful_count,
+               admin_status, admin_ingredients_en, verified_at
+        FROM products WHERE barcode = ?
+    """, (str(barcode),))    
     row = cursor.fetchone()
     conn.close()
     
-    if row:
-        return {
-            'barcode': row[0], 'status': row[1], 'ingredients_en': row[2],
-            'safe_count': row[3], 'haram_count': row[4], 'doubtful_count': row[5]
-        }
-    return None
+    if not row:
+        return None
+
+    is_verified = row[6] is not None  # admin_statusが入っていれば運営確認済み
+
+    return {
+        'barcode': row[0],
+        'status': row[1],                     # ユーザー投稿の多数決による判定
+        'ingredients_en': row[2],              # ユーザー投稿の原材料テキスト
+        'safe_count': row[3], 'haram_count': row[4], 'doubtful_count': row[5],
+        'admin_status': row[6],                # 運営確認済みの判定(未確認ならNone)
+        'admin_ingredients_en': row[7],        # 運営確認済みの原材料テキスト
+        'verified_at': row[8],
+        'is_verified': is_verified,
+        # 【最終的に画面に出すべき値】運営確認済みならそちらを優先し、なければ従来の多数決結果を使う
+        'display_status': row[6] if is_verified else row[1],
+        'display_ingredients_en': row[7] if is_verified else row[2],
+    }
 
 def save_product(barcode, status, ingredients_en):
     """新しい商品をデータベースに保存、または既存なら多数決のカウントを増やす"""
@@ -120,3 +153,56 @@ def save_product(barcode, status, ingredients_en):
     
     # 【★ここが最大のポイント】保存が終わったらすぐにGitHubへ送信！
     push_to_github()
+
+def get_doubtful_products():
+    """
+    運営が確認すべき「DOUBTFUL(疑義あり)かつ、まだ運営未確認」の商品を一覧取得する。
+    admin_statusが既に入っている(=確認済み)ものは、再度一覧に出さない。
+    """
+    init_db()
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT barcode, status, ingredients_en
+        FROM products
+        WHERE status = 'DOUBTFUL' AND admin_status IS NULL
+        ORDER BY barcode
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {'barcode': r[0], 'status': r[1], 'ingredients_en': r[2]}
+        for r in rows
+    ]
+
+def update_product(barcode, status, ingredients_en):
+    """
+    【運営による手直し用】admin_status / admin_ingredients_en という
+    "別のセル"に運営の確認結果を書き込む。
+    ユーザー投稿による status / ingredients_en(多数決の記録)は上書きせず、そのまま残す。
+
+    save_product()との違い:
+      - save_product()  : ユーザーからの投稿を「多数決の1票」として status/ingredients_en に積み増す
+      - update_product(): 運営が調査した結果を admin_status/admin_ingredients_en に別途記録する
+    """
+    init_db()
+
+    existing = search_product(barcode)
+    if not existing:
+        # 存在しないバーコードを更新しようとした場合は何もしない
+        return False
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE products
+        SET admin_status = ?, admin_ingredients_en = ?, verified_at = ?
+        WHERE barcode = ?
+    """, (status, ingredients_en, datetime.now().strftime("%Y-%m-%d %H:%M"), str(barcode)))
+    conn.commit()
+    conn.close()
+
+    # 手直し結果もGitHubへ自動バックアップする（既存の仕組みをそのまま利用）
+    push_to_github()
+    return True

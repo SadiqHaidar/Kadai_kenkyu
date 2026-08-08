@@ -21,6 +21,12 @@ def main():
         st.session_state.found_haram = []
     if "found_doubtful" not in st.session_state:
         st.session_state.found_doubtful = []
+    if "is_admin" not in st.session_state:
+        st.session_state.is_admin = False
+    if "rotation_angle" not in st.session_state:
+        st.session_state.rotation_angle = 0
+    if "uploaded_file_key" not in st.session_state:
+        st.session_state.uploaded_file_key = None
 
     st.set_page_config(
         page_title="Halal Checker", 
@@ -30,16 +36,14 @@ def main():
     st.title("🌙 Halal Checker")
     st.write("بِسْمِ ٱللّٰهِ ٱلرَّحْمٰنِ ٱلرَّحِيمِ")
 
-    tab1, tab2 = st.tabs(["Ingredient Label Analysis", "Barcode Verification"]) # タブの追加: 原材料分析とバーコード検証
+    tab1, tab2, tab3 = st.tabs(["Ingredient Label Analysis", "Barcode Verification", "⚙️ Admin"]) # タブの追加: 原材料分析・バーコード検証・運営用の手直し
 
-    # OCRモデルの読み込み（キャッシュして高速化）
-    @st.cache_resource  
-
+    # 【改善①】OCRモデルの読み込みを「関数定義」だけに留め、ここではまだ呼び出さない。
+    # こうすることでタブの描画（画面表示）がブロックされなくなる。
+    # 実際の読み込みは「Analyzeボタンが押された瞬間」まで遅延させる。
+    @st.cache_resource(show_spinner="🔍 Preparing OCR engine (first time only, please wait)...")
     def load_ocr():
-
         return easyocr.Reader(['ja', 'en'], gpu=False) # 日本語と英語をサポート
-
-    reader = load_ocr()
 
     with tab1: # タブ1: 原材料分析
         # カメラまたはファイルアップロード
@@ -59,8 +63,19 @@ def main():
             # 【修正！】スマホ写真の回転情報を補正（文字化け対策に必須）
             img = ImageOps.exif_transpose(img)
             
-            # 【ここを追加！】巨大な画像をトリミング画面からはみ出さないように最大横幅800pxに縮小
-            img.thumbnail((600, 600))
+            # 【改善】縮小しすぎると文字が潰れて見えなくなるため、元画像の解像度の上限を引き上げる。
+            # 画面への表示自体は st_cropper 側の should_resize_image=True が幅に合わせて縮小してくれる。
+            img.thumbnail((1400, 1400))
+
+            current_file_key = f"{img_file.name}_{img_file.size}"
+            if st.session_state.uploaded_file_key != current_file_key:
+                st.session_state.uploaded_file_key = current_file_key
+                st.session_state.rotation_angle = 0
+
+            # 保存されている角度ぶん、実際に画像を回転させる。
+            # expand=True は「回転後にはみ出た部分を切り取らず、画像全体のサイズを広げて収める」設定。
+            if st.session_state.rotation_angle != 0:
+                img = img.rotate(st.session_state.rotation_angle, expand=True)
 
             # ✨【さらに追加！】小さくした画像を、スマホの画面幅にぴったりフィットさせて表示する
             st.image(img, caption="アップロードされた画像", use_container_width=True)
@@ -68,27 +83,41 @@ def main():
             # --- 手動トリミング機能 ---
             st.subheader("✂️ Step 1: Crop Ingredients Area")
             st.info("Please specify the range so that the ""Ingredients"" (原材料名)section fits within it.")
-            
-            # 自由な比率で切り抜き
-            #cropped_img = st_cropper(img, realtime_update=True, box_color='#00FF00', aspect_ratio=None, should_resize_image=True)
-            
-            # 画面を 「5%の余白 | 90%の本番画面 | 5%の余白」 に3分割する
-            col1, col2, col3 = st.columns([1, 18, 1])
 
-            with col2: # 真ん中の90%のエリアの中だけでトリミング画面を動かす
-                cropped_img = st_cropper(
-                    img, 
-                    realtime_update=True, 
-                    box_color='#00FF00', 
-                    aspect_ratio=None, 
-                    should_resize_image=True
-                )
+            # 【改善】カラムで幅を90%に絞ると、スマホでは画像がさらに小さく表示され、
+            # 文字が見えづらくなる原因になっていたため、幅いっぱいに表示するよう変更。
+            cropped_img = st_cropper(
+                img,
+                realtime_update=True,
+                box_color='#00FF00',
+                aspect_ratio=None,
+                should_resize_image=True  # 【修正】画面幅に収めて表示するために必要な設定だったため、Trueに戻す
+            )
+
+            # 【新機能】手動回転ボタン
+            st.write("向きがおかしい場合は回転してください:")
+            rot_col1, rot_col2, rot_col3 = st.columns(3)
+            with rot_col1:
+                if st.button("⟲ 左に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
+                    st.rerun()
+            with rot_col2:
+                if st.button("⟳ 右に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
+                    st.rerun()
+            with rot_col3:
+                if st.button("↺ リセット"):
+                    st.session_state.rotation_angle = 0
+                    st.rerun()
 
             st.write("Target area:")
             st.image(cropped_img, width=300)
 
             if st.button("🔍 Analyze This Area"):
                 with st.spinner('Analyzing...'):
+                    # 【改善①つづき】ここで初めてOCRモデルを取得。
+                    # 2回目以降はcache_resourceにより一瞬でロードされる。
+                    reader = load_ocr()
                     img_array = np.array(cropped_img)
                     results = reader.readtext(img_array, detail=0)
                     raw_text = " ".join(results) # 文字がくっつかないようスペース結合
@@ -199,12 +228,92 @@ def main():
 
                     # すでに登録がある場合
                     st.info("Product is registered in the database!")
-                    st.write(f"Judgment Result: {product['status']}")
-                    st.write(f"Ingredients: {product['ingredients_en']}")
+
+                    if product['is_verified']:
+                        st.success(f"✅ Verified by the operating team ({product['verified_at']})")
+                    else:
+                        st.caption("ℹ️ This result is based on community submissions and has not been verified by the operating team yet.")
+
+                    st.write(f"Judgment Result: {product['display_status']}")
+                    st.write(f"Ingredients: {product['display_ingredients_en']}")
                 else:
                     st.warning("This product is not yet registered. Please analyze it in the Ingredient Label Analysis tab.")
             else:
                 st.error("Failed to detect barcode. Please take a photo in a well-lit area.")
+
+    with tab3: # タブ3: 運営による疑義判定の手直し
+        st.subheader("⚙️ Admin: Review & Correct Doubtful Products")
+
+        # --- 認証パート ---
+        # st.secrets["ADMIN_PASSWORD"] は Streamlit CloudのSecrets設定画面で登録する。
+        # コードにもリポジトリにもパスワードそのものは書き込まれない。
+        if not st.session_state.is_admin:
+            st.info("This section is for the operating team only.")
+            input_pw = st.text_input("Admin Password", type="password")
+            if st.button("Login"):
+                correct_pw = st.secrets.get("ADMIN_PASSWORD", None)
+                if correct_pw and input_pw == correct_pw:
+                    st.session_state.is_admin = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
+        else:
+            col_a, col_b = st.columns([5, 1])
+            with col_a:
+                st.success("✅ Logged in as Admin")
+            with col_b:
+                if st.button("Logout"):
+                    st.session_state.is_admin = False
+                    st.rerun()
+
+            st.divider()
+
+            # --- 確認待ちの一覧表示 ---
+            st.write("### 📋 Products Needing Review (DOUBTFUL)")
+            doubtful_list = d_util.get_doubtful_products()
+            if doubtful_list:
+                st.caption("Click a product to load it into the correction form below.")
+                for item in doubtful_list:
+                    preview = item['ingredients_en'][:60] + ("..." if len(item['ingredients_en']) > 60 else "")
+                    # ボタンを押すと、そのバーコードをsession_stateに保存 → 下の検索欄に自動反映される
+                    if st.button(f"🔍 {item['barcode']} : {preview}", key=f"select_{item['barcode']}"):
+                        st.session_state.admin_barcode_input = item['barcode']
+                        st.rerun()
+            else:
+                st.write("No doubtful products pending review. 🎉")
+
+            st.divider()
+
+            # --- 個別バーコードの手直しフォーム ---
+            st.write("### 🔧 Correct a Product's Judgment")
+            target_barcode = st.text_input("Enter barcode to correct", key="admin_barcode_input")
+
+            if target_barcode:
+                product = d_util.search_product(target_barcode)
+                if product:
+                    st.write(f"📥 Community-reported judgment: **{product['status']}**")
+                    if product['is_verified']:
+                        st.write(f"✅ Already verified by admin on {product['verified_at']}: **{product['admin_status']}**")
+                    else:
+                        st.write("🕗 Not yet verified by admin.")
+
+                    status_options = ["SAFE", "DOUBTFUL", "HARAM"]
+                    # フォームの初期値は、運営確認済みならその値、なければユーザー投稿の値を使う
+                    prefill_status = product['display_status']
+                    prefill_ingredients = product['display_ingredients_en']
+                    current_index = status_options.index(prefill_status) if prefill_status in status_options else 0
+
+                    with st.form(key="admin_correction_form"):
+                        new_status = st.selectbox("Verified Judgment", status_options, index=current_index)
+                        new_ingredients = st.text_area("Verified Ingredients Text", value=prefill_ingredients)
+                        save_correction = st.form_submit_button("💾 Save Verification")
+
+                        if save_correction:
+                            d_util.update_product(target_barcode, new_status, new_ingredients)
+                            st.success("Verification saved successfully!")
+                            st.rerun()
+                else:
+                    st.warning("No product found with this barcode.")
 
 if __name__ == "__main__":
     main()
