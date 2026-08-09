@@ -63,53 +63,75 @@ def main():
             # 【修正！】スマホ写真の回転情報を補正（文字化け対策に必須）
             img = ImageOps.exif_transpose(img)
             
-            # 【改善】縮小しすぎると文字が潰れて見えなくなるため、元画像の解像度の上限を引き上げる。
-            # 画面への表示自体は st_cropper 側の should_resize_image=True が幅に合わせて縮小してくれる。
-            img.thumbnail((1400, 1400))
+            # 【改善】OCR用に、元画像の解像度をなるべく保った「高解像度版」を別途用意する。
+            # img_full はクロップ操作の見た目には使わず、最終的な文字認識にだけ使う。
+            img_full = img.copy()
+            img_full.thumbnail((1600, 1600))
 
+            # こちらの img は「画面表示・クロップ操作専用」。
+            # スマホの画面幅を確実に超えないよう、控えめなサイズに抑える。
+            img.thumbnail((500, 500))
+
+            # 【新機能】新しい画像がアップロードされたら、回転角度を0度にリセットする。
+            # img_file.name + img_file.size を「その画像を識別するキー」として使い、
+            # 前回アップロードした画像と違うファイルなら「新しい画像だ」と判断する。
             current_file_key = f"{img_file.name}_{img_file.size}"
             if st.session_state.uploaded_file_key != current_file_key:
                 st.session_state.uploaded_file_key = current_file_key
                 st.session_state.rotation_angle = 0
 
-            # 保存されている角度ぶん、実際に画像を回転させる。
+            # 【新機能】手動回転ボタン
+            st.write("向きがおかしい場合は回転してください:")
+            rot_col1, rot_col2, rot_col3 = st.columns(3)
+            with rot_col1:
+                if st.button("⟲ 左に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
+                    st.rerun()
+            with rot_col2:
+                if st.button("⟳ 右に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
+                    st.rerun()
+            with rot_col3:
+                if st.button("↺ リセット"):
+                    st.session_state.rotation_angle = 0
+                    st.rerun()
+
+            # 保存されている角度ぶん、実際に画像を回転させる(表示用・OCR用の両方に同じ角度をかける)。
             # expand=True は「回転後にはみ出た部分を切り取らず、画像全体のサイズを広げて収める」設定。
             if st.session_state.rotation_angle != 0:
                 img = img.rotate(st.session_state.rotation_angle, expand=True)
+                img_full = img_full.rotate(st.session_state.rotation_angle, expand=True)
 
             # ✨【さらに追加！】小さくした画像を、スマホの画面幅にぴったりフィットさせて表示する
-            st.image(img, caption="Uploaded Image", use_container_width=True)
+            st.image(img, caption="アップロードされた画像", use_container_width=True)
 
             # --- 手動トリミング機能 ---
             st.subheader("✂️ Step 1: Crop Ingredients Area")
             st.info("Please specify the range so that the ""Ingredients"" (原材料名)section fits within it.")
 
-            # 【改善】カラムで幅を90%に絞ると、スマホでは画像がさらに小さく表示され、
-            # 文字が見えづらくなる原因になっていたため、幅いっぱいに表示するよう変更。
-            cropped_img = st_cropper(
+            # 【改善】ここで使う img は表示・操作専用の小さい画像(最大500px)。
+            # return_type='both' にすることで、「見た目用に切り抜かれた画像」に加えて
+            # 「枠の座標(left, top, width, height)」も受け取れるようにする。
+            cropped_img_preview, box = st_cropper(
                 img,
                 realtime_update=True,
                 box_color='#00FF00',
                 aspect_ratio=None,
-                should_resize_image=True  # 【修正】画面幅に収めて表示するために必要な設定だったため、Trueに戻す
+                should_resize_image=True,
+                return_type='both'
             )
 
-            # 【新機能】手動回転ボタン
-            st.write("🔄 Rotate Image (if needed)")
-            rot_col1, rot_col2, rot_col3 = st.columns(3)
-            with rot_col1:
-                if st.button("⟲ turn left 90°"):
-                    st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
-                    st.rerun()
-            with rot_col2:
-                if st.button("⟳ turn right 90°"):
-                    st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
-                    st.rerun()
-            with rot_col3:
-                if st.button("↺ Reset"):
-                    st.session_state.rotation_angle = 0
-                    st.rerun()
-                    
+            # 【改善】表示用画像(img)と高解像度画像(img_full)の縮小率の違いを計算し、
+            # 枠の座標を高解像度画像用の座標に変換する。
+            scale_x = img_full.width / img.width
+            scale_y = img_full.height / img.height
+            crop_left = int(box['left'] * scale_x)
+            crop_top = int(box['top'] * scale_y)
+            crop_right = crop_left + int(box['width'] * scale_x)
+            crop_bottom = crop_top + int(box['height'] * scale_y)
+
+            # 高解像度画像から、変換後の座標で切り抜く。これがOCRに渡される。
+            cropped_img = img_full.crop((crop_left, crop_top, crop_right, crop_bottom))
 
             st.write("Target area:")
             st.image(cropped_img, width=300)
