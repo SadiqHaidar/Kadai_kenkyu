@@ -40,7 +40,7 @@ def extract_ingredients(text):
 
     # 1. 判定前に「牛乳」「生乳」を「MILK」という無害な英単語に置き換える
     # これにより、後の「牛」というキーワードチェックにかからなくなります
-    text = text.replace("牛乳", "MILK").replace("生乳", "MILK")
+    text = text.replace("牛乳", "MILK")
     
     # 見つからなかった場合は、既に「MILK」置換済みのテキストを返す
     return text
