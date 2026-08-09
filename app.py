@@ -1,6 +1,7 @@
 import streamlit as st
 import easyocr
 import numpy as np
+import pandas as pd 
 from PIL import Image
 from PIL import ImageOps
 import constant as const
@@ -288,6 +289,43 @@ def main():
                 if st.button("Logout"):
                     st.session_state.is_admin = False
                     st.rerun()
+
+            st.divider()
+
+            # --- データベース全体の一覧表示 ---
+            st.write("### 🗂️ Full Product Database")
+            all_products = d_util.get_all_products()
+
+            if all_products:
+                # 判定結果でフィルタできるようにする
+                filter_choice = st.selectbox(
+                    "Filter by judgment",
+                    ["All", "SAFE", "DOUBTFUL", "HARAM"],
+                    key="admin_db_filter"
+                )
+                if filter_choice != "All":
+                    filtered = [p for p in all_products if p['display_status'] == filter_choice]
+                else:
+                    filtered = all_products
+
+                st.caption(f"{len(filtered)} of {len(all_products)} products shown.")
+
+                # 表形式で見やすく表示するため、pandasのDataFrameに変換する
+                table_rows = [
+                    {
+                        "Barcode": p['barcode'],
+                        "Judgment": p['display_status'],
+                        "Verified": "✅" if p['is_verified'] else "—",
+                        "Community Votes (S/D/H)": f"{p['safe_count']}/{p['doubtful_count']}/{p['haram_count']}",
+                        "Verified At": p['verified_at'] or "",
+                        "Ingredients": (p['ingredients_en'][:50] + "...") if len(p['ingredients_en']) > 50 else p['ingredients_en'],
+                    }
+                    for p in filtered
+                ]
+                df = pd.DataFrame(table_rows)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+            else:
+                st.write("No products registered yet.")
 
             st.divider()
 

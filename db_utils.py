@@ -176,6 +176,38 @@ def get_doubtful_products():
         for r in rows
     ]
 
+def get_all_products():
+    """
+    登録されている全商品を一覧取得する（運営がデータベース全体を確認するための関数）。
+    search_product()と同様に、display_status(画面に出すべき最終判定)も計算して返す。
+    """
+    init_db()
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT barcode, status, ingredients_en, safe_count, haram_count, doubtful_count,
+               admin_status, admin_ingredients_en, verified_at
+        FROM products
+        ORDER BY barcode
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+
+    products = []
+    for row in rows:
+        is_verified = row[6] is not None
+        products.append({
+            'barcode': row[0],
+            'status': row[1],
+            'ingredients_en': row[2],
+            'safe_count': row[3], 'haram_count': row[4], 'doubtful_count': row[5],
+            'admin_status': row[6],
+            'verified_at': row[8],
+            'is_verified': is_verified,
+            'display_status': row[6] if is_verified else row[1],
+        })
+    return products
+
 def update_product(barcode, status, ingredients_en):
     """
     【運営による手直し用】admin_status / admin_ingredients_en という
