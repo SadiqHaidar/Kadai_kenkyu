@@ -95,7 +95,7 @@ def main():
             )
 
             # 【新機能】手動回転ボタン
-            st.write("🔄 Step 2: Rotate Image (if needed)")
+            st.write("🔄 Rotate Image (if needed)")
             rot_col1, rot_col2, rot_col3 = st.columns(3)
             with rot_col1:
                 if st.button("⟲ turn left 90°"):
@@ -109,6 +109,7 @@ def main():
                 if st.button("↺ Reset"):
                     st.session_state.rotation_angle = 0
                     st.rerun()
+                    
 
             st.write("Target area:")
             st.image(cropped_img, width=300)
