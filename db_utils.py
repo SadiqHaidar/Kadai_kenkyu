@@ -92,6 +92,21 @@ def push_to_github():
     except Exception as e:
         st.warning(f"⚠️ Cloud Backup Notice: {e}")
 
+def _calculate_majority_status(safe_count, haram_count, doubtful_count):
+    """
+    3種類の投稿数(safe_count, haram_count, doubtful_count)から、
+    最も票数の多い判定を「多数決の結果」として算出する。
+
+    同数で並んだ場合は、安全側を優先する(HARAM > DOUBTFUL > SAFE の順)。
+    これは、判定に迷うくらいなら「食べても大丈夫」と誤って伝えるよりも、
+    「注意が必要」と伝える方がリスクが小さい、という考え方に基づく。
+    """
+    counts = {"HARAM": haram_count, "DOUBTFUL": doubtful_count, "SAFE": safe_count}
+    max_count = max(counts.values())
+    for candidate in ["HARAM", "DOUBTFUL", "SAFE"]:
+        if counts[candidate] == max_count:
+            return candidate
+
 def search_product(barcode):
     """バーコード番号でデータベースを検索する"""
     init_db()
@@ -125,7 +140,7 @@ def search_product(barcode):
     }
 
 def save_product(barcode, status, ingredients_en):
-    """新しい商品をデータベースに保存、または既存なら多数決のカウントを増やす"""
+    """新しい商品をデータベースに保存、または既存なら投稿数を増やし、多数決で最終判定を更新する"""
     init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -133,16 +148,24 @@ def save_product(barcode, status, ingredients_en):
     existing = search_product(barcode)
     
     if existing:
-        if status == "SAFE":
-            cursor.execute("UPDATE products SET safe_count = safe_count + 1 WHERE barcode = ?", (str(barcode),))
-        elif status == "HARAM":
-            cursor.execute("UPDATE products SET haram_count = haram_count + 1 WHERE barcode = ?", (str(barcode),))
-        else:
-            cursor.execute("UPDATE products SET doubtful_count = doubtful_count + 1 WHERE barcode = ?", (str(barcode),))
+        # 既存の投稿数に、今回の1票を足した「更新後の投稿数」を先に計算する
+        new_safe = existing['safe_count'] + (1 if status == "SAFE" else 0)
+        new_haram = existing['haram_count'] + (1 if status == "HARAM" else 0)
+        new_doubtful = existing['doubtful_count'] + (1 if status == "DOUBTFUL" else 0)
+
+        # 【新規】更新後の投稿数から、多数決で最終的なstatusを算出する
+        majority_status = _calculate_majority_status(new_safe, new_haram, new_doubtful)
+
+        cursor.execute("""
+            UPDATE products
+            SET safe_count = ?, haram_count = ?, doubtful_count = ?, status = ?
+            WHERE barcode = ?
+        """, (new_safe, new_haram, new_doubtful, majority_status, str(barcode)))
     else:
         s_vote = 1 if status == "SAFE" else 0
         h_vote = 1 if status == "HARAM" else 0
         d_vote = 1 if status == "DOUBTFUL" else 0
+        # 初回投稿の場合、多数決の結果は「その1票そのもの」になる
         cursor.execute("""
             INSERT INTO products (barcode, status, ingredients_en, safe_count, haram_count, doubtful_count)
             VALUES (?, ?, ?, ?, ?, ?)
