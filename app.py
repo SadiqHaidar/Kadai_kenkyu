@@ -217,9 +217,10 @@ def main():
                         # 保存実行
                         if submit_button:
                             d_util.save_product(
-                                barcode=detected_code,
-                                status=st.session_state.temp_status, # 前のステップで保存した判定結果
-                                ingredients_en=st.session_state.temp_ingredients # 解析した原材料
+                                barcode = detected_code,
+                                status = st.session_state.temp_status, # 前のステップで保存した判定結果
+                                ingredients_en = st.session_state.temp_ingredients, # 解析した原材料
+                                matched_keywords = st.session_state.found_haram + st.session_state.found_doubtful
                             )
                             st.success("Registration Complete!")
                             st.balloons() # お祝いの演出

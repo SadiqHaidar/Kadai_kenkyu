@@ -36,6 +36,7 @@ def init_db():
         "admin_status": "TEXT",
         "admin_ingredients_en": "TEXT",
         "verified_at": "TEXT",
+        "match_keywords": "TEXT"
     }
     for col_name, col_type in new_columns.items():
         if col_name not in existing_columns:
@@ -114,7 +115,7 @@ def search_product(barcode):
     cursor = conn.cursor()
     cursor.execute("""
         SELECT barcode, status, ingredients_en, safe_count, haram_count, doubtful_count,
-               admin_status, admin_ingredients_en, verified_at
+               admin_status, admin_ingredients_en, verified_at, match_keywords
         FROM products WHERE barcode = ?
     """, (str(barcode),))    
     row = cursor.fetchone()
@@ -134,16 +135,21 @@ def search_product(barcode):
         'admin_ingredients_en': row[7],        # 運営確認済みの原材料テキスト
         'verified_at': row[8],
         'is_verified': is_verified,
+        # 【新規】判定の根拠になった単語(カンマ区切りで保存されているのでリストに変換)
+        'matched_keywords': row[9].split(",") if row[9] else [],
         # 【最終的に画面に出すべき値】運営確認済みならそちらを優先し、なければ従来の多数決結果を使う
         'display_status': row[6] if is_verified else row[1],
         'display_ingredients_en': row[7] if is_verified else row[2],
     }
 
-def save_product(barcode, status, ingredients_en):
+def save_product(barcode, status, ingredients_en, matched_keywords=None):
     """新しい商品をデータベースに保存、または既存なら投稿数を増やし、多数決で最終判定を更新する"""
     init_db()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+
+    if matched_keywords is None:
+        matched_keywords = []
     
     existing = search_product(barcode)
     
@@ -156,21 +162,25 @@ def save_product(barcode, status, ingredients_en):
         # 【新規】更新後の投稿数から、多数決で最終的なstatusを算出する
         majority_status = _calculate_majority_status(new_safe, new_haram, new_doubtful)
 
+        combined_keywords = sorted(set(existing['matched_keywords']) | set(matched_keywords))
+        keywords_text = ",".join(combined_keywords)
+
         cursor.execute("""
             UPDATE products
-            SET safe_count = ?, haram_count = ?, doubtful_count = ?, status = ?
+            SET safe_count = ?, haram_count = ?, doubtful_count = ?, status = ?, match_keywords = ?
             WHERE barcode = ?
-        """, (new_safe, new_haram, new_doubtful, majority_status, str(barcode)))
+        """, (new_safe, new_haram, new_doubtful, majority_status, keywords_text, str(barcode)))
     else:
         s_vote = 1 if status == "SAFE" else 0
         h_vote = 1 if status == "HARAM" else 0
         d_vote = 1 if status == "DOUBTFUL" else 0
+        keywords_text = ",".join(sorted(set(matched_keywords)))
         # 初回投稿の場合、多数決の結果は「その1票そのもの」になる
         cursor.execute("""
-            INSERT INTO products (barcode, status, ingredients_en, safe_count, haram_count, doubtful_count)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (str(barcode), status, ingredients_en, s_vote, h_vote, d_vote))
-        
+            INSERT INTO products (barcode, status, ingredients_en, safe_count, haram_count, doubtful_count, match_keywords)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (str(barcode), status, ingredients_en, s_vote, h_vote, d_vote, keywords_text))
+
     conn.commit()
     conn.close()
     
@@ -186,7 +196,7 @@ def get_doubtful_products():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT barcode, status, ingredients_en
+        SELECT barcode, status, ingredients_en, match_keywords
         FROM products
         WHERE status = 'DOUBTFUL' AND admin_status IS NULL
         ORDER BY barcode
@@ -195,7 +205,7 @@ def get_doubtful_products():
     conn.close()
 
     return [
-        {'barcode': r[0], 'status': r[1], 'ingredients_en': r[2]}
+        {'barcode': r[0], 'status': r[1], 'ingredients_en': r[2], 'matched_keywords': r[3].split(",") if r[3] else []}
         for r in rows
     ]
 
@@ -209,7 +219,7 @@ def get_all_products():
     cursor = conn.cursor()
     cursor.execute("""
         SELECT barcode, status, ingredients_en, safe_count, haram_count, doubtful_count,
-               admin_status, admin_ingredients_en, verified_at
+               admin_status, admin_ingredients_en, verified_at, match_keywords
         FROM products
         ORDER BY barcode
     """)
@@ -228,6 +238,7 @@ def get_all_products():
             'verified_at': row[8],
             'is_verified': is_verified,
             'display_status': row[6] if is_verified else row[1],
+            'matched_keywords': row[9].split(",") if row[9] else [],
         })
     return products
 
