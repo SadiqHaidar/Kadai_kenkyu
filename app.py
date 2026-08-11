@@ -318,12 +318,12 @@ def main():
                         "Verified": "✅" if p['is_verified'] else "—",
                         "Community Votes (S/D/H)": f"{p['safe_count']}/{p['doubtful_count']}/{p['haram_count']}",
                         "Verified At": p['verified_at'] or "",
-                        "Ingredients": (p['ingredients_en'][:50] + "...") if len(p['ingredients_en']) > 50 else p['ingredients_en'],
+                        "Ingredients": p['ingredients_en']
                     }
                     for p in filtered
                 ]
                 df = pd.DataFrame(table_rows)
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, use_container_width=True, hide_index=True, column_config={"Ingredients": st.column_config.TextColumn(width="large")})
             else:
                 st.write("No products registered yet.")
 
