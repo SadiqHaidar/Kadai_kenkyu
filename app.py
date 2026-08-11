@@ -1,7 +1,7 @@
 import streamlit as st
 import easyocr
 import numpy as np
-import pandas as pd 
+import pandas as pd
 from PIL import Image
 from PIL import ImageOps
 import constant as const
@@ -68,7 +68,7 @@ def main():
             # img_full はクロップ操作の見た目には使わず、最終的な文字認識にだけ使う。
             img_full = img.copy()
             img_full.thumbnail((1600, 1600))
-    
+
             # こちらの img は「画面表示・クロップ操作専用」。
             # スマホの画面幅を確実に超えないよう、控えめなサイズに抑える。
             img.thumbnail((500, 500))
@@ -81,6 +81,22 @@ def main():
                 st.session_state.uploaded_file_key = current_file_key
                 st.session_state.rotation_angle = 0
 
+            # 【新機能】手動回転ボタン
+            st.write("向きがおかしい場合は回転してください:")
+            rot_col1, rot_col2, rot_col3 = st.columns(3)
+            with rot_col1:
+                if st.button("⟲ 左に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
+                    st.rerun()
+            with rot_col2:
+                if st.button("⟳ 右に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
+                    st.rerun()
+            with rot_col3:
+                if st.button("↺ リセット"):
+                    st.session_state.rotation_angle = 0
+                    st.rerun()
+
             # 保存されている角度ぶん、実際に画像を回転させる(表示用・OCR用の両方に同じ角度をかける)。
             # expand=True は「回転後にはみ出た部分を切り取らず、画像全体のサイズを広げて収める」設定。
             if st.session_state.rotation_angle != 0:
@@ -88,7 +104,7 @@ def main():
                 img_full = img_full.rotate(st.session_state.rotation_angle, expand=True)
 
             # ✨【さらに追加！】小さくした画像を、スマホの画面幅にぴったりフィットさせて表示する
-            st.image(img, caption="Uploaded Image", use_container_width=True)
+            st.image(img, caption="アップロードされた画像", use_container_width=True)
 
             # --- 手動トリミング機能 ---
             st.subheader("✂️ Step 1: Crop Ingredients Area")
@@ -105,22 +121,6 @@ def main():
                 should_resize_image=True,
                 return_type='both'
             )
-
-             # 【新機能】手動回転ボタン
-            st.write("Please rotate the image if needed:")
-            rot_col1, rot_col2, rot_col3 = st.columns(3)
-            with rot_col1:
-                if st.button("⟲ turn left 90°"):
-                    st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
-                    st.rerun()
-            with rot_col2:
-                if st.button("⟳ turn right 90°"):
-                    st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
-                    st.rerun()
-            with rot_col3:
-                if st.button("↺ Reset"):
-                    st.session_state.rotation_angle = 0
-                    st.rerun()
 
             # 【改善】表示用画像(img)と高解像度画像(img_full)の縮小率の違いを計算し、
             # 枠の座標を高解像度画像用の座標に変換する。
@@ -217,10 +217,11 @@ def main():
                         # 保存実行
                         if submit_button:
                             d_util.save_product(
-                                barcode = detected_code,
-                                status = st.session_state.temp_status, # 前のステップで保存した判定結果
-                                ingredients_en = st.session_state.temp_ingredients, # 解析した原材料
-                                matched_keywords = st.session_state.found_haram + st.session_state.found_doubtful
+                                barcode=detected_code,
+                                status=st.session_state.temp_status, # 前のステップで保存した判定結果
+                                ingredients_en=st.session_state.temp_ingredients, # 解析した原材料
+                                # 【新規】見つかったHARAM/DOUBTFULの単語も一緒に保存する
+                                matched_keywords=st.session_state.found_haram + st.session_state.found_doubtful
                             )
                             st.success("Registration Complete!")
                             st.balloons() # お祝いの演出
@@ -261,6 +262,8 @@ def main():
 
                     st.write(f"Judgment Result: {product['display_status']}")
                     st.write(f"Ingredients: {product['display_ingredients_en']}")
+                    if product['matched_keywords']:
+                        st.write(f"Flagged words: {', '.join(product['matched_keywords'])}")
                 else:
                     st.warning("This product is not yet registered. Please analyze it in the Ingredient Label Analysis tab.")
             else:
@@ -318,13 +321,24 @@ def main():
                         "Judgment": p['display_status'],
                         "Verified": "✅" if p['is_verified'] else "—",
                         "Community Votes (S/D/H)": f"{p['safe_count']}/{p['doubtful_count']}/{p['haram_count']}",
+                        "Flagged Words": ", ".join(p['matched_keywords']) if p['matched_keywords'] else "",
                         "Verified At": p['verified_at'] or "",
-                        "Ingredients": p['ingredients_en']
+                        "Ingredients": p['ingredients_en'],  # 【修正】省略せず全文を表示する
                     }
                     for p in filtered
                 ]
                 df = pd.DataFrame(table_rows)
-                st.dataframe(df, use_container_width=True, hide_index=True, column_config={"Ingredients": st.column_config.TextColumn(width="large")})
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        # 【追加】Ingredients列だけ広めの幅を指定して、全文が見やすいようにする。
+                        # それでも収まらない場合は、列の境界をドラッグしてさらに広げることもできる。
+                        "Ingredients": st.column_config.TextColumn(width="large"),
+                    },
+                )
+                st.caption("💡 Tip: You can drag a column's edge to resize it, or click a cell and press the expand icon to see the full text.")
             else:
                 st.write("No products registered yet.")
 
@@ -336,9 +350,14 @@ def main():
             if doubtful_list:
                 st.caption("Click a product to load it into the correction form below.")
                 for item in doubtful_list:
-                    preview = item['ingredients_en'][:60] + ("..." if len(item['ingredients_en']) > 60 else "")
+                    # 【改善】原材料の一部プレビューではなく、引っかかった単語をそのまま見せる方が、
+                    # 運営が「何を確認すべきか」を一目で判断しやすい。
+                    if item['matched_keywords']:
+                        flag_preview = "Flagged: " + ", ".join(item['matched_keywords'])
+                    else:
+                        flag_preview = "(no specific keyword recorded)"
                     # ボタンを押すと、そのバーコードをsession_stateに保存 → 下の検索欄に自動反映される
-                    if st.button(f"🔍 {item['barcode']} : {preview}", key=f"select_{item['barcode']}"):
+                    if st.button(f"🔍 {item['barcode']} : {flag_preview}", key=f"select_{item['barcode']}"):
                         st.session_state.admin_barcode_input = item['barcode']
                         st.rerun()
             else:
@@ -354,6 +373,8 @@ def main():
                 product = d_util.search_product(target_barcode)
                 if product:
                     st.write(f"📥 Community-reported judgment: **{product['status']}**")
+                    if product['matched_keywords']:
+                        st.write(f"🚩 Flagged words: **{', '.join(product['matched_keywords'])}**")
                     if product['is_verified']:
                         st.write(f"✅ Already verified by admin on {product['verified_at']}: **{product['admin_status']}**")
                     else:
