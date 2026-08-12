@@ -81,30 +81,11 @@ def main():
                 st.session_state.uploaded_file_key = current_file_key
                 st.session_state.rotation_angle = 0
 
-            # 【新機能】手動回転ボタン
-            st.write("向きがおかしい場合は回転してください:")
-            rot_col1, rot_col2, rot_col3 = st.columns(3)
-            with rot_col1:
-                if st.button("⟲ 左に90度"):
-                    st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
-                    st.rerun()
-            with rot_col2:
-                if st.button("⟳ 右に90度"):
-                    st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
-                    st.rerun()
-            with rot_col3:
-                if st.button("↺ リセット"):
-                    st.session_state.rotation_angle = 0
-                    st.rerun()
-
             # 保存されている角度ぶん、実際に画像を回転させる(表示用・OCR用の両方に同じ角度をかける)。
             # expand=True は「回転後にはみ出た部分を切り取らず、画像全体のサイズを広げて収める」設定。
             if st.session_state.rotation_angle != 0:
                 img = img.rotate(st.session_state.rotation_angle, expand=True)
                 img_full = img_full.rotate(st.session_state.rotation_angle, expand=True)
-
-            # ✨【さらに追加！】小さくした画像を、スマホの画面幅にぴったりフィットさせて表示する
-            st.image(img, caption="アップロードされた画像", use_container_width=True)
 
             # --- 手動トリミング機能 ---
             st.subheader("✂️ Step 1: Crop Ingredients Area")
@@ -121,6 +102,22 @@ def main():
                 should_resize_image=True,
                 return_type='both'
             )
+
+            # 【新機能】手動回転ボタン
+            st.write("向きがおかしい場合は回転してください:")
+            rot_col1, rot_col2, rot_col3 = st.columns(3)
+            with rot_col1:
+                if st.button("⟲ 左に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
+                    st.rerun()
+            with rot_col2:
+                if st.button("⟳ 右に90度"):
+                    st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
+                    st.rerun()
+            with rot_col3:
+                if st.button("↺ リセット"):
+                    st.session_state.rotation_angle = 0
+                    st.rerun()
 
             # 【改善】表示用画像(img)と高解像度画像(img_full)の縮小率の違いを計算し、
             # 枠の座標を高解像度画像用の座標に変換する。
