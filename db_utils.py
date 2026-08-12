@@ -235,9 +235,11 @@ def get_all_products():
             'ingredients_en': row[2],
             'safe_count': row[3], 'haram_count': row[4], 'doubtful_count': row[5],
             'admin_status': row[6],
+            'admin_ingredients_en': row[7], # 運営が確認した成分情報
             'verified_at': row[8],
             'is_verified': is_verified,
             'display_status': row[6] if is_verified else row[1],
+            'display_ingredients_en': row[7] if is_verified else row[2],
             'matched_keywords': row[9].split(",") if row[9] else [],
         })
     return products

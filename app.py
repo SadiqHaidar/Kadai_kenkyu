@@ -320,7 +320,7 @@ def main():
                         "Community Votes (S/D/H)": f"{p['safe_count']}/{p['doubtful_count']}/{p['haram_count']}",
                         "Flagged Words": ", ".join(p['matched_keywords']) if p['matched_keywords'] else "",
                         "Verified At": p['verified_at'] or "",
-                        "Ingredients": p['ingredients_en'],  # 【修正】省略せず全文を表示する
+                        "Ingredients": p['display_ingredients_en'],  # 【修正】省略せず全文を表示する
                     }
                     for p in filtered
                 ]
