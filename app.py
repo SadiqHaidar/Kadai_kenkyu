@@ -104,18 +104,18 @@ def main():
             )
 
             # 【新機能】手動回転ボタン
-            st.write("向きがおかしい場合は回転してください:")
+            st.write("Please rotate the image if needed:")
             rot_col1, rot_col2, rot_col3 = st.columns(3)
             with rot_col1:
-                if st.button("⟲ 左に90度"):
+                if st.button("⟲ Rotate Left 90°"):
                     st.session_state.rotation_angle = (st.session_state.rotation_angle + 90) % 360
                     st.rerun()
             with rot_col2:
-                if st.button("⟳ 右に90度"):
+                if st.button("⟳ Rotate Right 90°"):
                     st.session_state.rotation_angle = (st.session_state.rotation_angle - 90) % 360
                     st.rerun()
             with rot_col3:
-                if st.button("↺ リセット"):
+                if st.button("↺ Reset"):
                     st.session_state.rotation_angle = 0
                     st.rerun()
 
