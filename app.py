@@ -31,7 +31,7 @@ def main():
 
     st.set_page_config(
         page_title="Halal Checker", 
-        page_icon="Halal.png"  # 👈 ここに用意した画像ファイル名を書くだけ！
+        page_icon="Halal.png"
     )
 
     st.title("🌙 Halal Checker")
